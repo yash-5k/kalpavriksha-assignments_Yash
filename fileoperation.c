@@ -1,16 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define FILE_NAME "users.txt"
 #define NAME_MAX_LENGTH 50
 
+// A struct to hold the data for one person.
 typedef struct {
     int userId;
     char fullName[NAME_MAX_LENGTH];
     int userAge;
 } PersonRecord;
 
+// A necessary function to clear the input buffer.
 void clearInputBuffer() {
     int c;
     while ((c = getchar()) != '\n' && c != EOF) {}
@@ -19,7 +22,7 @@ void clearInputBuffer() {
 void addPerson() {
     FILE *fp = fopen(FILE_NAME, "a");
     if (!fp) {
-        perror("File open error");
+        perror("Error opening file");
         return;
     }
 
@@ -30,7 +33,7 @@ void addPerson() {
 
     printf("Enter full name: ");
     fgets(person.fullName, NAME_MAX_LENGTH, stdin);
-    person.fullName[strcspn(person.fullName, "\n")] = '\0';  // Trim newline
+    
 
     printf("Enter age: ");
     scanf("%d", &person.userAge);
@@ -42,65 +45,55 @@ void addPerson() {
     printf("Person record saved.\n");
 }
 
-void showAll() {
+void displayAllRecords() {
     FILE *fp = fopen(FILE_NAME, "r");
     if (!fp) {
-        printf("No records found.\n");
+        printf("No records found or file cannot be opened.\n");
         return;
     }
 
     char buffer[256];
-    printf("ID\tName\t\tAge\n----------------------------\n");
+    printf("\nID\tName\t\t\tAge\n-------------------------------------------\n");
+
     while (fgets(buffer, sizeof(buffer), fp)) {
         PersonRecord person;
-        char *token = strtok(buffer, "#");
-        if (token) person.userId = atoi(token);
-
-        token = strtok(NULL, "#");
-        if (token) strncpy(person.fullName, token, NAME_MAX_LENGTH);
-
-        token = strtok(NULL, "#");
-        if (token) person.userAge = atoi(token);
-
-        printf("%d\t%s\t\t%d\n", person.userId, person.fullName, person.userAge);
+        if (sscanf(buffer, "%d#%49[^#]#%d", &person.userId, person.fullName, &person.userAge) == 3) {
+             printf("%d\t%-20s\t%d\n", person.userId, person.fullName, person.userAge);
+        }
     }
     fclose(fp);
 }
 
 void modifyRecord() {
-    printf("Enter ID to modify: ");
     int idToModify;
+    printf("Enter ID to modify: ");
     scanf("%d", &idToModify);
     clearInputBuffer();
 
     FILE *fp = fopen(FILE_NAME, "r");
     FILE *temp = fopen("temp.txt", "w");
+
     if (!fp || !temp) {
-        perror("Unable to read/write files");
+        perror("Error opening files");
         if (fp) fclose(fp);
         if (temp) fclose(temp);
         return;
     }
 
     char buffer[256];
-    int found = 0;
+    bool found = false;
+
     while (fgets(buffer, sizeof(buffer), fp)) {
         PersonRecord person;
-        char *token = strtok(buffer, "#");
-        if (token) person.userId = atoi(token);
-
-        token = strtok(NULL, "#");
-        if (token) strncpy(person.fullName, token, NAME_MAX_LENGTH);
-        person.fullName[strcspn(person.fullName, "\n")] = '\0';
-
-        token = strtok(NULL, "#");
-        if (token) person.userAge = atoi(token);
+        if (sscanf(buffer, "%d#%49[^#]#%d", &person.userId, person.fullName, &person.userAge) != 3) {
+            fputs(buffer, temp);
+            continue;
+        }
 
         if (person.userId == idToModify) {
-            found = 1;
+            found = true;
             printf("Enter new name: ");
             fgets(person.fullName, NAME_MAX_LENGTH, stdin);
-            person.fullName[strcspn(person.fullName, "\n")] = '\0';
 
             printf("Enter new age: ");
             scanf("%d", &person.userAge);
@@ -114,51 +107,41 @@ void modifyRecord() {
     fclose(temp);
 
     if (!found) {
-        printf("No matching record found for ID %d.\n", idToModify);
+        printf("Record with ID %d not found.\n", idToModify);
         remove("temp.txt");
-        return;
+    } else {
+        remove(FILE_NAME);
+        rename("temp.txt", FILE_NAME);
+        printf("Record updated successfully.\n");
     }
-
-    remove(FILE_NAME);
-    rename("temp.txt", FILE_NAME);
-    printf("Record updated successfully.\n");
 }
 
 void removePerson() {
-    printf("Enter ID to remove: ");
     int idToRemove;
+    printf("Enter ID to remove: ");
     scanf("%d", &idToRemove);
     clearInputBuffer();
 
     FILE *fp = fopen(FILE_NAME, "r");
     FILE *temp = fopen("temp.txt", "w");
+
     if (!fp || !temp) {
-        perror("File read/write error");
+        perror("Error opening files");
         if (fp) fclose(fp);
         if (temp) fclose(temp);
         return;
     }
 
     char buffer[256];
-    int deleted = 0;
+    bool deleted = false;
+    int currentId;
+
     while (fgets(buffer, sizeof(buffer), fp)) {
-        PersonRecord person;
-        char *token = strtok(buffer, "#");
-        if (token) person.userId = atoi(token);
-
-        token = strtok(NULL, "#");
-        if (token) strncpy(person.fullName, token, NAME_MAX_LENGTH);
-        person.fullName[strcspn(person.fullName, "\n")] = '\0';
-
-        token = strtok(NULL, "#");
-        if (token) person.userAge = atoi(token);
-
-        if (person.userId == idToRemove) {
-            deleted = 1;
-            continue;
+        if (sscanf(buffer, "%d#", &currentId) == 1 && currentId == idToRemove) {
+            deleted = true;
+        } else {
+            fputs(buffer, temp);
         }
-
-        fprintf(temp, "%d#%s#%d\n", person.userId, person.fullName, person.userAge);
     }
 
     fclose(fp);
@@ -167,33 +150,54 @@ void removePerson() {
     if (!deleted) {
         printf("User ID %d not found.\n", idToRemove);
         remove("temp.txt");
-        return;
+    } else {
+        remove(FILE_NAME);
+        rename("temp.txt", FILE_NAME);
+        printf("Record deleted.\n");
     }
-
-    remove(FILE_NAME);
-    rename("temp.txt", FILE_NAME);
-    printf("Record deleted.\n");
 }
 
 int main() {
     int option;
-    while (1) {
+    bool isRunning = true;
+
+    while (isRunning) {
         printf("\n==== Manage Users ====\n");
-        printf("1. Add Record\n2. Show Records\n3. Update Record\n4. Delete Record\n5. Exit\nSelect: ");
+        printf("1. Add Record\n");
+        printf("2. Display All Records\n");
+        printf("3. Update Record\n");
+        printf("4. Delete Record\n");
+        printf("5. Exit\n");
+        printf("Select an option: ");
+
         if (scanf("%d", &option) != 1) {
-            printf("Please enter a valid number.\n");
+            printf("Invalid input. Please enter a number.\n");
             clearInputBuffer();
             continue;
         }
         clearInputBuffer();
 
         switch (option) {
-            case 1: addPerson(); break;
-            case 2: showAll(); break;
-            case 3: modifyRecord(); break;
-            case 4: removePerson(); break;
-            case 5: printf("Goodbye!\n"); return 0;
-            default: printf("Option not valid, try again.\n");
+            case 1:
+                addPerson();
+                break;
+            case 2:
+                displayAllRecords();
+                break;
+            case 3:
+                modifyRecord();
+                break;
+            case 4:
+                removePerson();
+                break;
+            case 5:
+                isRunning = false;
+                break;
+            default:
+                printf("Option not valid. Please try again.\n");
         }
     }
+
+    printf("Goodbye!\n");
+    return 0;
 }
