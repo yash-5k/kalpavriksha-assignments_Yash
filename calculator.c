@@ -1,130 +1,204 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
+#include <stdbool.h>
 
-#define MAX_EXPRESSION_LENGTH 150
+#define FILE_NAME "users.txt"
+#define NAME_MAX_LENGTH 50
 
-// Useful flags to signal error conditions
-int error_divide_by_zero = 0;
-int error_invalid_syntax = 0;
+// A struct to hold the data for one person.
+typedef struct {
+    int userId;
+    char fullName[NAME_MAX_LENGTH];
+    int userAge;
+} PersonRecord;
 
-// Trims leading and trailing spaces from the string input
-void trim_spaces(const char **text) {
-    while (**text && isspace(**text)) (*text)++;
+// A necessary function to clear the input buffer.
+void clearInputBuffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF) {}
 }
 
-// Reads and converts the next integer from the string
-int read_integer(const char **text) {
-    trim_spaces(text);
-    int sign = 1;
-    if (**text == '-') {
-        sign = -1;
-        (*text)++;
+void addPerson() {
+    FILE *fp = fopen(FILE_NAME, "a");
+    if (!fp) {
+        perror("Error opening file");
+        return;
     }
-    if (!isdigit(**text)) {
-        error_invalid_syntax = 1;
-        return 0;
-    }
-    int value = 0;
-    while (isdigit(**text)) {
-        value = value * 10 + (**text - '0');
-        (*text)++;
-    }
-    return sign * value;
+
+    PersonRecord person;
+    printf("Enter user ID: ");
+    scanf("%d", &person.userId);
+    clearInputBuffer();
+
+    printf("Enter full name: ");
+    fgets(person.fullName, NAME_MAX_LENGTH, stdin);
+  
+
+    printf("Enter age: ");
+    scanf("%d", &person.userAge);
+    clearInputBuffer();
+
+    fprintf(fp, "%d#%s#%d\n", person.userId, person.fullName, person.userAge);
+    fclose(fp);
+
+    printf("Person record saved.\n");
 }
 
-// Handles '*' and '/' operations with precedence
-int calculate_md(const char **text) {
-    trim_spaces(text);
-    int result = read_integer(text);
-    trim_spaces(text);
-    while (**text == '*' || **text == '/') {
-        char op = **text;
-        (*text)++;
-        int right_side = read_integer(text);
-        if (error_invalid_syntax) return 0;
-        if (op == '*')
-            result *= right_side;
-        else {
-            if (right_side == 0) {
-                error_divide_by_zero = 1;
-                return 0;
-            }
-            result /= right_side;
+void displayAllRecords() {
+    FILE *fp = fopen(FILE_NAME, "r");
+    if (!fp) {
+        printf("No records found or file cannot be opened.\n");
+        return;
+    }
+
+    char buffer[256];
+    printf("\nID\tName\t\t\tAge\n-------------------------------------------\n");
+
+    while (fgets(buffer, sizeof(buffer), fp)) {
+        PersonRecord person;
+        if (sscanf(buffer, "%d#%49[^#]#%d", &person.userId, person.fullName, &person.userAge) == 3) {
+             printf("%d\t%-20s\t%d\n", person.userId, person.fullName, person.userAge);
         }
-        trim_spaces(text);
     }
-    return result;
+    fclose(fp);
 }
 
-// Handles '+' and '-' operations
-int calculate_as(const char **text) {
-    trim_spaces(text);
-    int result = calculate_md(text);
-    trim_spaces(text);
-    while (**text == '+' || **text == '-') {
-        char op = **text;
-        (*text)++;
-        int right_side = calculate_md(text);
-        if (error_invalid_syntax || error_divide_by_zero) return 0;
-        if (op == '+') result += right_side;
-        else result -= right_side;
-        trim_spaces(text);
+void modifyRecord() {
+    int idToModify;
+    printf("Enter ID to modify: ");
+    scanf("%d", &idToModify);
+    clearInputBuffer();
+
+    FILE *fp = fopen(FILE_NAME, "r");
+    FILE *temp = fopen("temp.txt", "w");
+
+    if (!fp || !temp) {
+        perror("Error opening files");
+        if (fp) fclose(fp);
+        if (temp) fclose(temp);
+        return;
     }
-    return result;
+
+    char buffer[256];
+    bool found = false;
+
+    while (fgets(buffer, sizeof(buffer), fp)) {
+        PersonRecord person;
+        if (sscanf(buffer, "%d#%49[^#]#%d", &person.userId, person.fullName, &person.userAge) != 3) {
+            fputs(buffer, temp);
+            continue;
+        }
+
+        if (person.userId == idToModify) {
+            found = true;
+            printf("Enter new name: ");
+            fgets(person.fullName, NAME_MAX_LENGTH, stdin);
+            
+
+            printf("Enter new age: ");
+            scanf("%d", &person.userAge);
+            clearInputBuffer();
+        }
+
+        fprintf(temp, "%d#%s#%d\n", person.userId, person.fullName, person.userAge);
+    }
+
+    fclose(fp);
+    fclose(temp);
+
+    if (!found) {
+        printf("Record with ID %d not found.\n", idToModify);
+        remove("temp.txt");
+    } else {
+        remove(FILE_NAME);
+        rename("temp.txt", FILE_NAME);
+        printf("Record updated successfully.\n");
+    }
 }
 
-// Checks if the input has forbidden characters
-int contains_bad_character(const char *input) {
-    while (*input) {
-        if (!isdigit(*input) && !isspace(*input) &&
-            *input != '+' && *input != '-' && *input != '*' && *input != '/')
-            return 1;
-        input++;
-    }
-    return 0;
-}
+void removePerson() {
+    int idToRemove;
+    printf("Enter ID to remove: ");
+    scanf("%d", &idToRemove);
+    clearInputBuffer();
 
-// Removes starting and ending quotes, if present
-void remove_quotes(char *text) {
-    int len = strlen(text);
-    if (len >= 2 && text[0] == '"' && text[len-1] == '"') {
-        // Remove ending quote
-        text[len-1] = '\0';
-        // Remove starting quote
-        memmove(text, text+1, len-1);
+    FILE *fp = fopen(FILE_NAME, "r");
+    FILE *temp = fopen("temp.txt", "w");
+
+    if (!fp || !temp) {
+        perror("Error opening files");
+        if (fp) fclose(fp);
+        if (temp) fclose(temp);
+        return;
+    }
+
+    char buffer[256];
+    bool deleted = false;
+    int currentId;
+
+    while (fgets(buffer, sizeof(buffer), fp)) {
+        if (sscanf(buffer, "%d#", &currentId) == 1 && currentId == idToRemove) {
+            deleted = true;
+        } else {
+            fputs(buffer, temp);
+        }
+    }
+
+    fclose(fp);
+    fclose(temp);
+
+    if (!deleted) {
+        printf("User ID %d not found.\n", idToRemove);
+        remove("temp.txt");
+    } else {
+        remove(FILE_NAME);
+        rename("temp.txt", FILE_NAME);
+        printf("Record deleted.\n");
     }
 }
 
 int main() {
-    char expression[MAX_EXPRESSION_LENGTH];
-    if (fgets(expression, sizeof(expression), stdin) == NULL) {
-        printf("Error: Invalid expression.\n");
-        return 0;
+    int option;
+    bool isRunning = true;
+
+    while (isRunning) {
+        printf("\n==== Manage Users ====\n");
+        printf("1. Add Record\n");
+        printf("2. Display All Records\n");
+        printf("3. Update Record\n");
+        printf("4. Delete Record\n");
+        printf("5. Exit\n");
+        printf("Select an option: ");
+
+        if (scanf("%d", &option) != 1) {
+            printf("Invalid input. Please enter a number.\n");
+            clearInputBuffer();
+            continue;
+        }
+        clearInputBuffer();
+
+        switch (option) {
+            case 1:
+                addPerson();
+                break;
+            case 2:
+                displayAllRecords();
+                break;
+            case 3:
+                modifyRecord();
+                break;
+            case 4:
+                removePerson();
+                break;
+            case 5:
+                isRunning = false;
+                break;
+            default:
+                printf("Option not valid. Please try again.\n");
+        }
     }
-    // Remove newline at the end, if any
-    expression[strcspn(expression, "\n")] = '\0';
 
-    // If user entered string with quotes, strip them
-    remove_quotes(expression);
-
-    // Check for any disallowed characters
-    if (contains_bad_character(expression)) {
-        printf("Error: Invalid expression.\n");
-        return 0;
-    }
-
-    // Start parsing and calculating
-    const char *scan = expression;
-    int answer = calculate_as(&scan);
-
-    trim_spaces(&scan);
-    if (error_invalid_syntax || *scan != '\0') {
-        printf("Error: Invalid expression.\n");
-    } else if (error_divide_by_zero) {
-        printf("Error: Division by zero.\n");
-    } else {
-        printf("%d\n", answer);
-    }
+    printf("Goodbye!\n");
     return 0;
 }
