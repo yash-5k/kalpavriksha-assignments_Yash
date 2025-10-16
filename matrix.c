@@ -1,121 +1,123 @@
 #include <stdio.h>
-#include <stdlib.h> 
+#include <stdlib.h>
 
-void printMatrix(const int* matrix, int n);
-void rotateMatrix(int* matrix, int n);
-void smoothMatrix(int* matrix, int n);
+void printMatrix(const int* matrixPtr, int dimension);
+void rotateMatrix(int* matrixPtr, int dimension);
+void smoothMatrix(int* matrixPtr, int dimension);
 
 int main() {
-    int n;
+    int matrixSize;
     printf("Enter matrix size (2-10): ");
-    scanf("%d", &n);
+    scanf("%d", &matrixSize);
 
-    if (n < 2 || n > 10) {
+    if (matrixSize < 2 || matrixSize > 10) {
         fprintf(stderr, "Error: Matrix size must be between 2 and 10.\n");
-        return 1; 
+        return 1;
     }
 
-    int a[n][n];
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            a[i][j] = rand() % 256;
+
+    int matrix[matrixSize][matrixSize];
+
+    for (int row = 0; row < matrixSize; row++) {
+        for (int col = 0; col < matrixSize; col++) {
+            matrix[row][col] = rand() % 256;
         }
     }
 
-    int *ptr = (int *)a;
+    int *matrixPtr = (int *)matrix;
 
     printf("\nOriginal Randomly Generated Matrix:\n");
-    printMatrix(ptr, n);
+    printMatrix(matrixPtr, matrixSize);
 
-    //Rotate Matrix 90° Clockwise 
-    rotateMatrix(ptr, n);
+    rotateMatrix(matrixPtr, matrixSize);
     printf("\nMatrix after 90° Clockwise Rotation:\n");
-    printMatrix(ptr, n);
+    printMatrix(matrixPtr, matrixSize);
 
-    // Apply 3x3 Smoothing Filter
-    smoothMatrix(ptr, n);
+    smoothMatrix(matrixPtr, matrixSize);
     printf("\nMatrix after Applying 3x3 Smoothing Filter:\n");
-    printMatrix(ptr, n);
+    printMatrix(matrixPtr, matrixSize);
 
     return 0;
 }
 
-void printMatrix(const int* matrix, int n) {
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%d", *(matrix + i * n + j));
+void printMatrix(const int* matrixPtr, int dimension) {
+    for (int row = 0; row < dimension; row++) {
+        for (int col = 0; col < dimension; col++) {
+            printf("%5d", *(matrixPtr + row * dimension + col));
         }
         printf("\n");
     }
 }
 
-void rotateMatrixTwoStep(int* matrix, int n) {
-    for (int i = 0; i < n; i++) {
-        for (int j = i; j < n; j++) {
-            int* p1 = matrix + i * n + j; 
-            int* p2 = matrix + j * n + i; 
-            int temp = *p1;
-            *p1 = *p2;
-            *p2 = temp;
+void rotateMatrix(int* matrixPtr, int dimension) {
+    for (int row = 0; row < dimension; row++) {
+        for (int col = row; col < dimension; col++) {
+            int* pointerToCell_RowCol = matrixPtr + row * dimension + col;
+            int* pointerToCell_ColRow = matrixPtr + col * dimension + row;
+            
+            int tempValue = *pointerToCell_RowCol;
+            *pointerToCell_RowCol = *pointerToCell_ColRow;
+            *pointerToCell_ColRow = tempValue;
         }
     }
 
-    for (int i = 0; i < n; i++) {
-        int* left = matrix + i * n;
-        int* right = matrix + i * n + (n - 1); 
-        while (left < right) {
-            int temp = *left;
-            *left = *right;
-            *right = temp;
-            left++;
-            right--;
+    for (int rowIndex = 0; rowIndex < dimension; rowIndex++) {
+        int* leftPointer = matrixPtr + rowIndex * dimension;
+        int* rightPointer = matrixPtr + rowIndex * dimension + (dimension - 1);
+        
+        while (leftPointer < rightPointer) {
+            int tempValue = *leftPointer;
+            *leftPointer = *rightPointer;
+            *rightPointer = tempValue;
+            
+            leftPointer++;
+            rightPointer--;
         }
     }
 }
 
-void smoothMatrix(int* matrix, int n) {
-    if (n < 2) return;
-    int* prevRow = (int*)malloc(n * sizeof(int));
-    int* currentRow = (int*)malloc(n * sizeof(int));
+void smoothMatrix(int* matrixPtr, int dimension) {
+    if (dimension < 2) return;
 
-    for (int r = 0; r < n; ++r) {
-        for (int k = 0; k < n; ++k) {
-            *(currentRow + k) = *(matrix + r * n + k);
+    int* previousRowBuffer = (int*)malloc(dimension * sizeof(int));
+    int* currentRowBuffer = (int*)malloc(dimension * sizeof(int));
+
+
+    for (int row = 0; row < dimension; ++row) {
+        for (int index = 0; index < dimension; ++index) {
+            *(currentRowBuffer + index) = *(matrixPtr + row * dimension + index);
         }
 
-     
-        for (int c = 0; c < n; ++c) {
-            long long sum = 0;
-            int count = 0;
+        for (int col = 0; col < dimension; ++col) {
+            long long sumOfNeighbors = 0;
+            int neighborCount = 0;
 
-            for (int dr = -1; dr <= 1; ++dr) {
-                for (int dc = -1; dc <= 1; ++dc) {
-                    int nr = r + dr; 
-                    int nc = c + dc;
+            for (int deltaRow = -1; deltaRow <= 1; ++deltaRow) {
+                for (int deltaCol = -1; deltaCol <= 1; ++deltaCol) {
+                    int neighborRow = row + deltaRow;
+                    int neighborCol = col + deltaCol;
 
-            
-                    if (nr >= 0 && nr < n && nc >= 0 && nc < n) {
-                        count++;
-                      
-                        if (dr == -1) {   
-                            sum += *(prevRow + nc);
-                        } else if (dr == 0) {
-                            sum += *(currentRow + nc);
-                        } else {     
-                            sum += *(matrix + nr * n + nc);
+                    if (neighborRow >= 0 && neighborRow < dimension && neighborCol >= 0 && neighborCol < dimension) {
+                        neighborCount++;
+                        
+                        if (deltaRow == -1) {
+                            sumOfNeighbors += *(previousRowBuffer + neighborCol);
+                        } else if (deltaRow == 0) {
+                            sumOfNeighbors += *(currentRowBuffer + neighborCol);
+                        } else {
+                            sumOfNeighbors += *(matrixPtr + neighborRow * dimension + neighborCol);
                         }
                     }
                 }
             }
-           
-            *(matrix + r * n + c) = (int)(sum / count);
+            *(matrixPtr + row * dimension + col) = (int)(sumOfNeighbors / neighborCount);
         }
 
-        for (int k = 0; k < n; ++k) {
-            *(prevRow + k) = *(currentRow + k);
+        for (int index = 0; index < dimension; ++index) {
+            *(previousRowBuffer + index) = *(currentRowBuffer + index);
         }
     }
 
-    free(prevRow);
-    free(currentRow);
+    free(previousRowBuffer);
+    free(currentRowBuffer);
 }
