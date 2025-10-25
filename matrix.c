@@ -43,7 +43,7 @@ int main() {
         }
     }
 
-    // Fill the matrix with random numbers
+
     for (int i = 0; i < matrixSize; i++) {
         for (int j = 0; j < matrixSize; j++) {
             *(*(matrix+i)+j) = rand() % 256;
@@ -81,12 +81,10 @@ void printMatrix(int** matrix, int dimension) {
 }
 
 void rotateMatrix(int** matrix, int dimension) {
-    // First transpose the matrix
     for (int row = 0; row < dimension; row++) {
         int* rowPtr = *(matrix + row);
         for (int col = row; col < dimension; col++) {
             int* colPtr = *(matrix + col) + row;
-            // Swap elements using pointers
             int temp = *rowPtr;
             *rowPtr = *colPtr;
             *colPtr = temp;
@@ -121,19 +119,14 @@ void smoothMatrix(int** matrix, int dimension) {
         return;
     }
 
-    // Start by copying first row to both buffers
     for (int col = 0; col < dimension; col++) {
-        prevRow[col] = matrix[0][col];
-        currRow[col] = matrix[0][col];
+        *(prevRow+col) = *(*(matrix+0)+col);
     }
 
-    // Process from second row onwards
     for (int row = 0; row < dimension; row++) {
-        // For rows after first, save current row's original values
-        if (row > 0) {
-            for (int col = 0; col < dimension; col++) {
-                currRow[col] = matrix[row][col];
-            }
+        // Save current row's original values
+        for (int col = 0; col < dimension; col++) {
+            *(currRow+col) = *(*(matrix+row)+col);
         }
 
         // Process each cell in current row
@@ -141,42 +134,37 @@ void smoothMatrix(int** matrix, int dimension) {
             int sum = 0;
             int count = 0;
 
-            // Look at each cell in the 3x3 window
             for (int i = -1; i <= 1; i++) {
                 for (int j = -1; j <= 1; j++) {
-                    // Calculate neighbor position
+               
                     int nRow = row + i;
                     int nCol = col + j;
 
-                    // Skip if outside matrix bounds
+                   
                     if (nRow < 0 || nRow >= dimension || nCol < 0 || nCol >= dimension) {
                         continue;
                     }
 
                     count++;
-                    
-                    // Choose value based on which row we're looking at
-                    if (i == -1) {         // Row above
-                        sum += prevRow[nCol];
-                    } else if (i == 0) {   // Current row
-                        sum += currRow[nCol];
-                    } else {               // Row below
-                        sum += matrix[nRow][nCol];
+                    if (i == -1) {        
+                        sum += *(prevRow+nCol);
+                    } else if (i == 0) {
+                        sum += *(currRow+nCol);
+                    } else {
+                        sum += *(*(matrix+nRow)+nCol);
                     }
                 }
             }
-            
-            // Update cell with average
-            matrix[row][col] = sum / count;
+
+            *(*(matrix+row)+col) = sum / count;
         }
 
         // Save current row for next iteration
         for (int col = 0; col < dimension; col++) {
-            prevRow[col] = currRow[col];
+            *(prevRow+col) = *(currRow+col);
         }
     }
 
     free(prevRow);
     free(currRow);
-}
 }
