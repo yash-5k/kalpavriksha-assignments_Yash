@@ -1,5 +1,4 @@
-// Refactored version with renamed variables and improved styling
-// Logic remains exactly the same as provided
+
 
 #include <stdio.h>
 #include <stdlib.h>
